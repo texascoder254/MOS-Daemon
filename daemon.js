@@ -143,7 +143,7 @@ async function pollLedger() {
         select: { equals: 'Pending' }
       },
       sorts: [{ timestamp: 'created_time', direction: 'ascending' }],
-      page_size: 90 // 5. Chunking read size (The Pulse)
+      page_size: 98 // 5. Chunking read size (The Pulse)
     }));
 
     if (response.results.length > 0) {
