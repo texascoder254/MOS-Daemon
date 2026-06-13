@@ -118,3 +118,10 @@ async function processIntent(intent) {
 // Start the daemon loop (breathes every 10 seconds)
 console.log("MOS Background Execution Daemon started...");
 setInterval(pollLedger, 10000);
+
+// Dummy web server so Render's free tier health check passes
+const http = require('http');
+const port = process.env.PORT || 3000;
+http.createServer((req, res) => res.end('Daemon alive')).listen(port, () => {
+  console.log(`Bound to port ${port} for Render health check`);
+});
