@@ -72,19 +72,32 @@ const IntentHandlers = {
   },
 
   'Standard Mutation': async (intent, payload) => {
-    // Universal Executor: Can handle ANY database write, create, or update dynamically
-    // Payload format: { action: "create" | "update" | "archive", params: { ...Notion API body } }
-    if (!payload.action || !payload.params) {
-      throw new Error("Standard Mutation missing 'action' or 'params' in JSON payload.");
+    // Universal Executor: handles any database write/create/update/archive.
+    // PAYLOAD CONTRACT (post-2026-06-13 fix): the JSON payload carries ONLY { action, properties }.
+    // The target page is read from the intent's typed 'Action Target' relation column — NEVER a URL
+    // inside the JSON. Notion auto-converts URLs in text into mention objects, which corrupts the raw
+    // JSON string and poison-pills the parser (see KI: "URLs/Mentions in JSON payloads break the daemon").
+    // If an ID must ever live in JSON, it must be a bare 32-char hex id, never a notion.so URL.
+    if (!payload.action) {
+      throw new Error("Standard Mutation missing 'action' in JSON payload.");
     }
+
+    // Resolve the target page from the typed Action Target column (preferred),
+    // falling back ONLY to a bare hex id in the payload (URLs are rejected by design).
+    const rawId =
+      intent.properties['Action Target']?.relation?.[0]?.id ||
+      (typeof payload.page_id === 'string' ? payload.page_id : null);
+    const targetId = (rawId && /^[0-9a-f]{32}$/i.test(rawId.replace(/-/g, ''))) ? rawId : null;
 
     let result;
     if (payload.action === 'create') {
-      result = await safeNotionCall(() => notion.pages.create(payload.params));
+      result = await safeNotionCall(() => notion.pages.create(payload.params || { parent: payload.parent, properties: payload.properties }));
     } else if (payload.action === 'update') {
-      result = await safeNotionCall(() => notion.pages.update(payload.params));
+      if (!targetId) throw new Error("Poison Pill: 'update' needs a valid page in the Action Target column (URLs in JSON are rejected).");
+      result = await safeNotionCall(() => notion.pages.update({ page_id: targetId, properties: payload.properties || {} }));
     } else if (payload.action === 'archive') {
-      result = await safeNotionCall(() => notion.pages.update({ page_id: payload.params.page_id, archived: true }));
+      if (!targetId) throw new Error("Poison Pill: 'archive' needs a valid page in the Action Target column.");
+      result = await safeNotionCall(() => notion.pages.update({ page_id: targetId, archived: true }));
     } else {
       throw new Error(`Unsupported Standard Mutation action: ${payload.action}`);
     }
