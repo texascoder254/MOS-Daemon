@@ -1,0 +1,14 @@
+{
+  "name": "mos-daemon",
+  "version": "1.0.0",
+  "description": "Margin OS Background Execution Daemon",
+  "main": "daemon.js",
+  "scripts": {
+    "start": "node daemon.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@notionhq/client": "^2.2.14",
+    "dotenv": "^16.4.5"
+  }
+}
