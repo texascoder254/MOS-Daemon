@@ -10,8 +10,12 @@ async function runMemoryGate(sourceSessionId) {
     const session = await notion.pages.retrieve({ page_id: sourceSessionId });
     const props = session.properties;
     
+    const isBuild = props['Session Type']?.select?.name === 'Build' || props['Type']?.select?.name === '🏗️ Build';
+
     // Check required fields are non-null
-    const requiredFields = ['Build Name', 'Fired By', 'Report'];
+    const requiredFields = ['Fired By', 'Report'];
+    if (isBuild) requiredFields.push('Build Name');
+
     for (let field of requiredFields) {
       if (!props[field] || (props[field].type === 'rich_text' && props[field].rich_text.length === 0)) {
         throw new Error(`Memory Gate Failed: Missing required field ${field}`);
@@ -25,10 +29,12 @@ async function runMemoryGate(sourceSessionId) {
       throw new Error(`Memory Gate Failed: Error Count > 0 but no KI entries spawned.`);
     }
 
-    // Must have artifacts linked before closeout
-    const bhLinked = props['Build']?.relation?.length > 0;
-    if (!bhLinked) {
-      throw new Error(`Memory Gate Failed: Build History relation missing.`);
+    // Must have artifacts linked before closeout for Builds
+    if (isBuild) {
+      const bhLinked = props['Build']?.relation?.length > 0;
+      if (!bhLinked) {
+        throw new Error(`Memory Gate Failed: Build History relation missing.`);
+      }
     }
 
     return true; // Memory Gate passed
